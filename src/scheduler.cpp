@@ -1,0 +1,149 @@
+#include "coroutine.h"
+#include <windows.h>
+#include <stdexcept>
+#include <algorithm>
+#include <chrono>
+
+namespace {
+    thread_local Scheduler* currentScheduler = nullptr;
+}
+
+Scheduler* GetCurrentScheduler() {
+    return currentScheduler;
+}
+
+void SetCurrentScheduler(Scheduler* scheduler) {
+    currentScheduler = scheduler;
+}
+
+Scheduler::Scheduler() : runningCoroutine(nullptr), vehHandle(nullptr), pendingException(nullptr) {
+    if (currentScheduler) {
+        throw std::runtime_error("Only one scheduler per thread is allowed.");
+    }
+
+    currentScheduler = this;
+    mainFiber = ConvertThreadToFiber(nullptr);
+    vehHandle = AddVectoredExceptionHandler(1, VectoredExceptionHandler);
+
+    DebugPrint("[Scheduler::Scheduler] Scheduler created and VEH registered\n");
+}
+
+Scheduler::~Scheduler() {
+    if (vehHandle) {
+        RemoveVectoredExceptionHandler(vehHandle);
+        DebugPrint("[Scheduler::~Scheduler] VEH unregistered\n");
+    }
+
+    currentScheduler = nullptr;
+    ConvertFiberToThread();
+}
+
+void Scheduler::Add(std::function<void()> func) {
+    auto co = std::make_unique<Coroutine>(std::move(func), nullptr, this);
+    runnableQueue.push_back(co.get());
+    coroutines.push_back(std::move(co));
+}
+
+void Scheduler::Run() {
+    DebugPrint("[Scheduler::Run] Starting scheduler with %zu initial coroutines\n", coroutines.size());
+
+    while (!coroutines.empty()) {
+        auto now = std::chrono::steady_clock::now();
+        while (!timers.empty() && timers.top().wakeupTime <= now) {
+            TimerNode node = timers.top();
+            timers.pop();
+            runnableQueue.push_back(node.coroutine);
+            sleepingCoroutines.erase(node.coroutine);
+        }
+
+        while (!runnableQueue.empty()) {
+            Coroutine* co = runnableQueue.front();
+            runnableQueue.pop_front();
+
+            if (co->state != Coroutine::State::Finished) {
+                DebugPrint("[Scheduler::Run] Resuming coroutine %p in state %d\n", co, static_cast<int>(co->state));
+                Resume(co);
+            }
+        }
+
+        for (const auto& co : coroutines) {
+            if (co->state == Coroutine::State::Suspended) {
+                if (sleepingCoroutines.find(co.get()) == sleepingCoroutines.end()) {
+                    runnableQueue.push_back(co.get());
+                }
+            }
+        }
+
+        coroutines.erase(std::remove_if(coroutines.begin(), coroutines.end(),
+            [](const std::unique_ptr<Coroutine>& co) {
+                if (co->state == Coroutine::State::Finished) {
+                    DebugPrint("[Scheduler::Run] Cleaning up finished coroutine %p\n", co.get());
+                    if (co->onDone) {
+                        co->onDone(co->exceptionState);
+                    }
+                    return true;
+                }
+                return false;
+            }), coroutines.end());
+
+        if (coroutines.empty()) {
+            DebugPrint("[Scheduler::Run] No more coroutines to run. Exiting.\n");
+            break;
+        }
+
+        if (runnableQueue.empty()) {
+            DWORD timeout = INFINITE;
+            if (!timers.empty()) {
+                auto nextWakeup = timers.top().wakeupTime;
+                auto timeToWait = std::chrono::duration_cast<std::chrono::milliseconds>(nextWakeup - std::chrono::steady_clock::now());
+                if (timeToWait.count() > 0) {
+                    timeout = static_cast<DWORD>(timeToWait.count());
+                } else {
+                    timeout = 0;
+                }
+            }
+            
+            if (timeout > 0 && timeout != INFINITE) {
+                Sleep(timeout);
+            } else if (timeout == INFINITE) {
+                Sleep(1);
+            }
+        }
+    }
+}
+
+void Scheduler::Resume(Coroutine* co) {
+    if (!co) return;
+
+    runningCoroutine = co;
+    co->state = Coroutine::State::Running;
+
+    SwitchToFiber(co->fiber);
+    DebugPrint("[Scheduler::Resume] Returned from coroutine context. Checking for exceptions.\n");
+
+    runningCoroutine = nullptr;
+    if (co->HasException()) {
+        DebugPrint("[Scheduler::Resume] Coroutine has an exception. Setting pendingException.\n");
+        pendingException = co;
+        co->state = Coroutine::State::Finished;
+    }
+}
+
+Coroutine* Scheduler::PollException() {
+    DebugPrint("[Scheduler::PollException] Polling for exception. Found: %p\n", pendingException);
+    Coroutine* co = pendingException;
+    pendingException = nullptr;
+    return co;
+}
+
+void Scheduler::AsyncSleep(uint32_t milliseconds) {
+    Scheduler* scheduler = GetCurrentScheduler();
+    if (!scheduler || !scheduler->runningCoroutine) return;
+
+    auto wakeupTime = std::chrono::steady_clock::now() + std::chrono::milliseconds(milliseconds);
+    Coroutine* co = scheduler->runningCoroutine;
+    scheduler->timers.push({wakeupTime, co});
+    scheduler->sleepingCoroutines.insert(co);
+    
+    Coroutine::YieldExecution();
+}
