@@ -2,7 +2,7 @@
 
 [English Project Introduction](README.md)
 
-基于 **Windows Fiber**、**向量化异常处理 (VEH)** 及 **CXX17** 实现的 C++ 协程库
+基于 **Windows Fiber**、**向量化异常处理 (VEH)** 及 **CXX17** 实现的 C++ 协程库。
 
 > ⚠️ 本项目是一个**练手项目**，旨在研究协程底层的调度、上下文切换和异常处理机制。由于核心实现依赖了 Windows Fiber，本项目**仅支持 Windows 平台**。同时，本项目不会提供生产级的性能优化或长期的社区支持。
 
