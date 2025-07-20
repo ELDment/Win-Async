@@ -25,18 +25,33 @@ A C++ coroutine library implemented based on **Windows Fiber**, **Vectored Excep
 
 ## 🛠️ Quick Start
 
-Build and run the benchmark using xmake
+### Using xmake
 
 ```powershell
-# Configure build options
+# Configure build options (Release mode)
 xmake f -m release
-xmake f -m debug
 
 # Build the project
 xmake
 
 # Run the benchmark
 xmake run benchmark
+```
+
+### Using CMake
+
+```powershell
+# Create and enter the build directory
+mkdir build; cd build
+
+# Generate the build system
+cmake ..
+
+# Build the project (Release mode)
+cmake --build . --config Release
+
+# Run the benchmark
+./Release/benchmark.exe
 ```
 
 ## 🗺️ TODO

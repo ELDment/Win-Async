@@ -25,18 +25,33 @@
 
 ## 🛠️ 快速开始
 
-使用 xmake 进行构建并运行基准测试。
+### 使用 xmake
 
 ```powershell
-# 配置编译选项
+# 配置编译选项（Release 模式）
 xmake f -m release
-xmake f -m debug
 
 # 构建项目
 xmake
 
 # 运行基准测试
 xmake run benchmark
+```
+
+### 使用 CMake
+
+```powershell
+# 创建并进入构建目录
+mkdir build; cd build
+
+# 生成构建系统
+cmake ..
+
+# 编译项目（Release 模式）
+cmake --build . --config Release
+
+# 运行基准测试
+./Release/benchmark.exe
 ```
 
 ## 🗺️ 未来计划
