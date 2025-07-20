@@ -1,49 +1,51 @@
 # 💻 Cpp-Coroutine
 
-基于 **Windows Fiber**、**向量化异常处理 (VEH)** 及 **CXX17** 实现的 C++ 协程库
+[简体中文项目介绍](README.zh-CN.md)
 
-> ⚠️ 本项目是一个**练手项目**，旨在研究协程底层的调度、上下文切换和异常处理机制。由于核心实现依赖了 Windows Fiber，本项目**仅支持 Windows 平台**。同时，本项目不会提供生产级的性能优化或长期的社区支持。
+A C++ coroutine library implemented based on **Windows Fiber**, **Vectored Exception Handling (VEH)**, and **C++17**.
 
-## ✨ 核心功能
+> ⚠️ This is a **learning project** aimed at exploring the underlying mechanisms of coroutine scheduling, context switching, and exception handling. Since the core implementation relies on Windows Fiber, this project **only supports the Windows platform**. Additionally, this project does not provide production-level performance optimizations or long-term community support.
 
-- 🚀 **混合调度模型**:
-  - 🤝 **单线程协作式调度**: 适用于 I/O 密集型任务，通过 `Yield` 实现高效的协作式多任务。
-  - ⚡ **多线程并行调度**: 内置线程池，通过 `Submit` 将 CPU 密集型任务分发至多核并行处理。
-- ⏳ **异步编程支持**:
-  - 🎁 **Future/Promise 模式**: 通过 `CoroutinePromise` 从协程外部安全地获取执行结果。
-  - 😴 **异步休眠**: 支持 `AsyncSleep`，允许协程在不阻塞线程的情况下进行延时操作。
-- 🛡️ **强大的异常处理**:
-  - 📦 **跨协程异常传递**: 能够安全地捕获协程内部异常，并将其传递给 `Promise`，防止程序崩溃。
+## ✨ Core Features
 
-## 🔧 实现原理
+- 🚀 **Hybrid Scheduling Model**:
+  - 🤝 **Single-Threaded Cooperative Scheduling**: Suitable for I/O-bound tasks, enabling efficient cooperative multitasking via `Yield`
+  - ⚡ **Multi-Threaded Parallel Scheduling**: Built-in thread pool to dispatch CPU-bound tasks to multiple cores for parallel processing using `Submit`
+- ⏳ **Asynchronous Programming Support**:
+  - 🎁 **Future/Promise Pattern**: Safely retrieve execution results from outside the coroutine using `CoroutinePromise`
+  - 😴 **Asynchronous Sleep**: Supports `AsyncSleep`, allowing coroutines to delay without blocking the thread
+- 🛡️ **Robust Exception Handling**:
+  - 📦 **Cross-Coroutine Exception Propagation**: Safely catches exceptions within a coroutine and passes them to the `Promise`, preventing program crashes
 
-- **上下文切换**: 基于 Windows `Fiber` API。
-- **异常捕获**: 通过向量化异常处理 (`VEH`) 捕获协程中的异常。
-- **调度循环**: 采用事件循环模型，通过 `std::deque` 管理可运行协程，并用 `std::priority_queue` 处理异步睡眠任务。
+## 🔧 Implementation Details
 
-## 🛠️ 快速开始
+- **Context Switching**: Based on the Windows `Fiber` API
+- **Exception Handling**: Captures exceptions in coroutines using Vectored Exception Handling (`VEH`)
+- **Scheduling Loop**: Uses an event loop model, managing runnable coroutines with `std::deque` and handling asynchronous sleep tasks with `std::priority_queue`
 
-使用 xmake 进行构建并运行基准测试
+## 🛠️ Quick Start
+
+Build and run the benchmark using xmake
 
 ```powershell
-# 配置编译选项
+# Configure build options
 xmake f -m release
 xmake f -m debug
 
-# 构建项目
+# Build the project
 xmake
 
-# 运行基准测试
+# Run the benchmark
 xmake run benchmark
 ```
 
-## 🗺️ 未来计划
+## 🗺️ TODO
 
-### 🚀 Cpp-Coroutine 未来开发计划
+### 🚀 Cpp-Coroutine Development Roadmap
 
-| 优先级 | 分类 | 主要任务 |
+| Priority | Category | Key Tasks |
 | :---: | :--- | :--- |
-| ⚡ | **C++20 协程支持** | - [ ] 设计 `Task<T>`<br>- [ ] 封装 Awaitables |
-| ⚡⚡⚡⚡ | **调度器与并发** | - [✅] 多线程调度器<br>- [ ] 集成 IOCP |
-| ⚡⚡ | **协程同步原语** | - [ ] 异步互斥锁（`AsyncMutex`）<br>- [ ] 异步信号量（`AsyncSemaphore`）<br>- [ ] 组合器（`WhenAll` / `WhenAny`） |
-| ⚡⚡⚡ | **API** | - [ ] 协作式取消（`CancellationToken`） |
+| ⚡ | **C++20 Coroutine Support** | - [ ] Design `Task<T>`<br>- [ ] Wrap Awaitables |
+| ⚡⚡⚡⚡ | **Scheduler & Concurrency** | - [✅] Multi-threaded scheduler<br>- [ ] Integrate IOCP |
+| ⚡⚡ | **Coroutine Sync Primitives** | - [ ] Async Mutex (`AsyncMutex`)<br>- [ ] Async Semaphore (`AsyncSemaphore`)<br>- [ ] Combinators (`WhenAll` / `WhenAny`) |
+| ⚡⚡⚡ | **API** | - [ ] Cooperative Cancellation (`CancellationToken`) |
