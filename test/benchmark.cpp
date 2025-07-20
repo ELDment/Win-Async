@@ -6,6 +6,7 @@
 #include <functional>
 #include <cassert>
 #include <memory>
+#include <sstream>
 
 struct TestCase {
     std::string name;
@@ -122,11 +123,29 @@ void TestAsyncSleep() {
     std::cout << "\tSimulated long I/O test completed." << std::endl;
 }
 
+void TestMultiThreadedScheduler() {
+    auto printThreadId = []() {
+        std::stringstream ss;
+        ss << "\tTask executed by thread: " << std::this_thread::get_id() << std::endl;
+        std::cout << ss.str();
+    };
+
+    Scheduler scheduler(4);
+
+    for (int i = 0; i < 10; ++i) {
+        scheduler.Submit(printThreadId);
+    }
+
+    std::this_thread::sleep_for(std::chrono::seconds(5));
+    scheduler.Stop();
+}
+
 int main() {
     RegisterTest("Basic Scheduling", TestBasicScheduling);
     RegisterTest("Exception Handling", TestExceptionHandling);
     RegisterTest("Parameter Passing and Return Values", TestParameterPassing);
     RegisterTest("Async Sleep", TestAsyncSleep);
+    RegisterTest("Multi-Threaded Scheduler", TestMultiThreadedScheduler);
 
     int passed = 0;
     int failed = 0;

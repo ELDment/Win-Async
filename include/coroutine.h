@@ -9,6 +9,9 @@
 #include <chrono>
 #include <queue>
 #include <unordered_set>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 #include <optional>
 #include <cstdarg>
 #include <cstdio>
@@ -72,11 +75,15 @@ class Scheduler {
 public:
     template <typename T>
     friend class CoroutinePromise;
+
     Scheduler();
+    explicit Scheduler(size_t numThreads);
     ~Scheduler();
 
     void Add(std::function<void()> func);
+    void Submit(std::function<void()> func);
     void Run();
+    void Stop();
     void Resume(Coroutine* co);
     Coroutine* PollException();
     static void AsyncSleep(uint32_t milliseconds);
@@ -139,6 +146,7 @@ public:
     }
 
 private:
+    void WorkerLoop();
     static LONG WINAPI VectoredExceptionHandler(PEXCEPTION_POINTERS ExceptionInfo);
 
     friend class Coroutine;
@@ -160,6 +168,14 @@ private:
     };
     std::priority_queue<TimerNode, std::vector<TimerNode>, std::greater<TimerNode>> timers;
     std::unordered_set<Coroutine*> sleepingCoroutines;
+
+    // Thread pool members
+    bool isThreadPool = false;
+    std::vector<std::thread> workers;
+    std::deque<std::function<void()>> tasks;
+    std::mutex queueMutex;
+    std::condition_variable condition;
+    bool stop = false;
 };
 
 template <typename T>

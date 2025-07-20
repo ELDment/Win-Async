@@ -16,7 +16,7 @@ void SetCurrentScheduler(Scheduler* scheduler) {
     currentScheduler = scheduler;
 }
 
-Scheduler::Scheduler() : runningCoroutine(nullptr), vehHandle(nullptr), pendingException(nullptr) {
+Scheduler::Scheduler() : runningCoroutine(nullptr), vehHandle(nullptr), pendingException(nullptr), isThreadPool(false), stop(false) {
     if (currentScheduler) {
         throw std::runtime_error("Only one scheduler per thread is allowed.");
     }
@@ -28,20 +28,57 @@ Scheduler::Scheduler() : runningCoroutine(nullptr), vehHandle(nullptr), pendingE
     DebugPrint("[Scheduler::Scheduler] Scheduler created and VEH registered\n");
 }
 
+Scheduler::Scheduler(size_t numThreads) : runningCoroutine(nullptr), vehHandle(nullptr), pendingException(nullptr), isThreadPool(true), stop(false) {
+    for (size_t i = 0; i < numThreads; ++i) {
+        workers.emplace_back(&Scheduler::WorkerLoop, this);
+    }
+}
+
 Scheduler::~Scheduler() {
     if (vehHandle) {
         RemoveVectoredExceptionHandler(vehHandle);
         DebugPrint("[Scheduler::~Scheduler] VEH unregistered\n");
     }
 
-    currentScheduler = nullptr;
-    ConvertFiberToThread();
+    if (isThreadPool) {
+        Stop();
+    } else {
+        currentScheduler = nullptr;
+        ConvertFiberToThread();
+    }
+}
+
+void Scheduler::Submit(std::function<void()> func) {
+    if (!isThreadPool) {
+        throw std::runtime_error("Submit is only for thread pool schedulers.");
+    }
+    {
+        std::unique_lock<std::mutex> lock(queueMutex);
+        tasks.push_back(std::move(func));
+    }
+    condition.notify_one();
 }
 
 void Scheduler::Add(std::function<void()> func) {
     auto co = std::make_unique<Coroutine>(std::move(func), nullptr, this);
     runnableQueue.push_back(co.get());
     coroutines.push_back(std::move(co));
+}
+
+void Scheduler::Stop() {
+    if (!isThreadPool) {
+        return;
+    }
+    {
+        std::unique_lock<std::mutex> lock(queueMutex);
+        stop = true;
+    }
+    condition.notify_all();
+    for (std::thread& worker : workers) {
+        if (worker.joinable()) {
+            worker.join();
+        }
+    }
 }
 
 void Scheduler::Run() {
@@ -134,6 +171,27 @@ Coroutine* Scheduler::PollException() {
     Coroutine* co = pendingException;
     pendingException = nullptr;
     return co;
+}
+
+void Scheduler::WorkerLoop() {
+    Scheduler localScheduler;
+    SetCurrentScheduler(&localScheduler);
+
+    while (true) {
+        std::function<void()> task;
+        {
+            std::unique_lock<std::mutex> lock(queueMutex);
+            condition.wait(lock, [this] { return stop || !tasks.empty(); });
+            if (stop && tasks.empty()) {
+                return;
+            }
+            task = std::move(tasks.front());
+            tasks.pop_front();
+        }
+
+        localScheduler.Add(std::move(task));
+        localScheduler.Run();
+    }
 }
 
 void Scheduler::AsyncSleep(uint32_t milliseconds) {
