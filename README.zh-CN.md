@@ -47,7 +47,7 @@ mkdir build; cd build
 # 生成构建系统
 cmake ..
 
-# 编译项目（Release 模式）
+# 构造项目（Release 模式）
 cmake --build . --config Release
 
 # 运行基准测试
