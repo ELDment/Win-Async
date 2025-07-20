@@ -2,7 +2,7 @@
 
 [简体中文项目介绍](README.zh-CN.md)
 
-A C++ coroutine library implemented based on **Windows Fiber**, **Vectored Exception Handling (VEH)**, and **C++17**.
+A C++ coroutine library implemented based on **Windows Fiber**, **Vectored Exception Handling (VEH)**, and **CXX17**.
 
 > ⚠️ This is a **learning project** aimed at exploring the underlying mechanisms of coroutine scheduling, context switching, and exception handling. Since the core implementation relies on Windows Fiber, this project **only supports the Windows platform**. Additionally, this project does not provide production-level performance optimizations or long-term community support.
 
