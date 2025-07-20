@@ -8,13 +8,13 @@ A C++ coroutine library implemented based on **Windows Fiber**, **Vectored Excep
 
 ## ✨ Core Features
 
-- 🚀 **Hybrid Scheduling Model**:
+- 🚀 **Hybrid Scheduling Model**
   - 🤝 **Single-Threaded Cooperative Scheduling**: Suitable for I/O-bound tasks, enabling efficient cooperative multitasking via `Yield`
   - ⚡ **Multi-Threaded Parallel Scheduling**: Built-in thread pool to dispatch CPU-bound tasks to multiple cores for parallel processing using `Submit`
-- ⏳ **Asynchronous Programming Support**:
+- ⏳ **Asynchronous Programming Support**
   - 🎁 **Future/Promise Pattern**: Safely retrieve execution results from outside the coroutine using `CoroutinePromise`
   - 😴 **Asynchronous Sleep**: Supports `AsyncSleep`, allowing coroutines to delay without blocking the thread
-- 🛡️ **Robust Exception Handling**:
+- 🛡️ **Robust Exception Handling**
   - 📦 **Cross-Coroutine Exception Propagation**: Safely catches exceptions within a coroutine and passes them to the `Promise`, preventing program crashes
 
 ## 🔧 Implementation Details
