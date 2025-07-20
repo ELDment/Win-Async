@@ -26,6 +26,10 @@
 使用 xmake 进行构建并运行基准测试
 
 ```powershell
+# 配置编译选项
+xmake f -m release
+xmake f -m debug
+
 # 构建项目
 xmake
 
