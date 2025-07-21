@@ -8,15 +8,16 @@ A C++ coroutine library implemented based on `Windows Fiber`, `VEH`, `IOCP`, and
 
 ## ✨ Core Features
 
-- 🚀 **Hybrid Scheduling Model**
-  - 🤝 **Cooperative (Single-Threaded)**: Ideal for I/O-bound tasks, using `Yield` for efficient multitasking
-  - ⚡ **Parallel (Multi-Threaded)**: Built-in thread pool to offload CPU-bound tasks via `Submit`
-- ⏳ **Asynchronous Programming Support**
-  - 🎁 **Future/Promise Pattern**: Safely retrieve results from coroutines using `CoroutinePromise`
-  - ✨ **Asynchronous I/O**: High-performance, event-driven I/O powered by **IOCP**, allowing coroutines to wait for I/O without blocking threads
-  - 😴 **Asynchronous Sleep**: `AsyncSleep` allows non-blocking delays
-- 🛡️ **Robust Exception Handling**
-  - 📦 **Cross-Coroutine Exception Propagation**: Safely catches and forwards exceptions to the `Promise`
+- 🚀 **Powerful Hybrid Scheduling Model**
+  - 🤝 **Cooperative I/O Coroutines**: Integrates `IOCP` to elegantly handle high-concurrency, non-blocking I/O operations
+  - ⚡ **Parallel CPU-Bound Tasks**: A built-in thread pool allows offloading high-latency tasks via `RunOnThreadPool`, preventing them from blocking the main I/O event loop
+
+- 💻 **Modern Asynchronous API (`Task`/`Await`)**
+  - 💡 **Synchronous-Style Coding**: Write asynchronous logic that reads like synchronous code using `CreateTask` and `Await`
+  - 🎁 **Seamless Result & Exception Propagation**: `Task<T>` transparently delivers results or exceptions from any coroutine (whether an I/O coroutine or a thread pool task) to the caller
+
+- 🛡️ **Robust Exception Safety**
+  - 📦 **Unified Exception Handling**: Automatically captures exceptions from any context (Fiber or thread pool) using Vectored Exception Handling (VEH) and safely propagates them through the `Promise`
 
 ## 🔧 How It Works
 
