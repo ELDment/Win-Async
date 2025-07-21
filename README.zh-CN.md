@@ -61,7 +61,7 @@ cmake --build . --config Release
 
 | 优先级 | 分类 | 主要任务 |
 | :---: | :--- | :--- |
-| ⚡ | **C++20 协程支持** | [√] 设计 `Task<T>`<br>[√] 封装 Awaitables |
+| ⚡⚡ | **C++20 协程支持** | [√] 设计 `Task<T>`<br>[√] 封装 Awaitables |
 | ⚡⚡⚡⚡ | **调度器与并发** | [√] 多线程调度器<br>[√] 集成 IOCP |
 | ⚡⚡ | **协程同步原语** | [ ] 异步互斥锁（`AsyncMutex`）<br>[ ] 异步信号量（`AsyncSemaphore`）<br>[ ] 组合器（`WhenAll` / `WhenAny`） |
-| ⚡⚡⚡ | **API** | [ ] 协作式取消（`CancellationToken`） |
+| ⚡ | **API** | [ ] 协作式取消（`CancellationToken`） |
