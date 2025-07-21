@@ -53,6 +53,14 @@ void Coroutine::Resume() {
     DebugPrint("[Coroutine::Resume] After scheduler->Resume, state=%d\n", static_cast<int>(state));
 }
 
+void Coroutine::SuspendExecution() {
+    Scheduler* scheduler = GetCurrentScheduler();
+    if (!scheduler) return;
+
+    scheduler->runningCoroutine = nullptr;
+    SwitchToFiber(scheduler->mainFiber);
+}
+
 void Coroutine::YieldExecution() {
     Scheduler* s = GetCurrentScheduler();
     if (!s || !s->runningCoroutine) {

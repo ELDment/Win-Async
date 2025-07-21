@@ -7,6 +7,7 @@
 #include <cassert>
 #include <memory>
 #include <sstream>
+#include <fstream>
 
 struct TestCase {
     std::string name;
@@ -105,7 +106,7 @@ void TestAsyncSleep() {
 
     scheduler.CreateCoroutine<void>([&]() {
         std::cout << "\tTimer coroutine started." << std::endl;
-        for (int i = 1; i <= 6; ++i) {
+        for (int i = 1; i <= 3; ++i) {
             printWithTimestamp("Timer: " + std::to_string(i) + "s");
             scheduler.AsyncSleep(1000);
         }
@@ -113,14 +114,83 @@ void TestAsyncSleep() {
     });
 
     scheduler.CreateCoroutine<void>([&]() {
-        printWithTimestamp("I/O coroutine started, simulating 5-second operation.");
-        scheduler.AsyncSleep(5000);
-        printWithTimestamp("I/O coroutine finished after 5 seconds.");
+        printWithTimestamp("I/O coroutine started, simulating 2 second operation.");
+        scheduler.AsyncSleep(2000);
+        printWithTimestamp("I/O coroutine finished after 2 seconds.");
     });
 
     scheduler.Run();
 
     std::cout << "\tSimulated long I/O test completed." << std::endl;
+}
+
+DWORD AsyncReadFile(HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead) {
+    Scheduler* scheduler = GetCurrentScheduler();
+    if (!scheduler || !scheduler->GetRunningCoroutine()) {
+        throw std::runtime_error("AsyncReadFile must be called from within a running coroutine.");
+    }
+
+    IoOperation op;
+    op.coroutine = scheduler->GetRunningCoroutine();
+
+    BOOL result = ReadFile(hFile, lpBuffer, nNumberOfBytesToRead, nullptr, &op);
+    DWORD lastError = GetLastError();
+
+    if (!result && lastError != ERROR_IO_PENDING) {
+        char errorMsg[256];
+        sprintf_s(errorMsg, "ReadFile failed immediately with error: %lu", lastError);
+        throw std::runtime_error(errorMsg);
+    }
+
+    Coroutine::SuspendExecution();
+
+    DWORD bytesRead = 0;
+    GetOverlappedResult(hFile, &op, &bytesRead, TRUE);
+    return bytesRead;
+}
+
+void TestAsyncIo() {
+    const char* testFileName = "io_test.txt";
+    const char* testContent = "Hello, Asynchronous World!";
+
+    {
+        std::ofstream outFile(testFileName);
+        outFile << testContent;
+    }
+
+    Scheduler scheduler;
+
+    HANDLE hFile = CreateFileA(testFileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        throw std::runtime_error("Failed to open test file for async reading.");
+    }
+
+    scheduler.RegisterHandle(hFile);
+
+    scheduler.CreateCoroutine<void>([&]() {
+        std::cout << "\tIO Coroutine: Starting async read." << std::endl;
+        char buffer[128] = {0};
+        DWORD bytesRead = AsyncReadFile(hFile, buffer, sizeof(buffer) - 1);
+        std::cout << "\tIO Coroutine: Read completed. Content: '" << buffer << "'" << std::endl;
+
+        assert(bytesRead == strlen(testContent));
+        assert(strcmp(buffer, testContent) == 0);
+        std::cout << "\tIO Coroutine: Content verification successful." << std::endl;
+    });
+
+    scheduler.CreateCoroutine<void>([]() {
+        std::cout << "\tWorker Coroutine: Starting." << std::endl;
+        for (int i = 0; i < 5; ++i) {
+            std::cout << "\tWorker Coroutine: Still running... (" << i + 1 << "/5)" << std::endl;
+            Scheduler::AsyncSleep(50);
+        }
+        std::cout << "\tWorker Coroutine: Finished." << std::endl;
+    });
+
+    scheduler.Run();
+
+    CloseHandle(hFile);
+    remove(testFileName);
 }
 
 void TestMultiThreadedScheduler() {
@@ -136,7 +206,7 @@ void TestMultiThreadedScheduler() {
         scheduler.Submit(printThreadId);
     }
 
-    std::this_thread::sleep_for(std::chrono::seconds(3));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     scheduler.Stop();
 }
 
@@ -146,6 +216,7 @@ int main() {
     RegisterTest("Parameter Passing and Return Values", TestParameterPassing);
     RegisterTest("Async Sleep", TestAsyncSleep);
     RegisterTest("Multi-Threaded Scheduler", TestMultiThreadedScheduler);
+    RegisterTest("Async IO", TestAsyncIo);
 
     int passed = 0;
     int failed = 0;

@@ -16,13 +16,17 @@ void SetCurrentScheduler(Scheduler* scheduler) {
     currentScheduler = scheduler;
 }
 
-Scheduler::Scheduler() : runningCoroutine(nullptr), vehHandle(nullptr), pendingException(nullptr), isThreadPool(false), stop(false) {
+Scheduler::Scheduler() : runningCoroutine(nullptr), vehHandle(nullptr), pendingException(nullptr), isThreadPool(false), stop(false), iocpHandle(nullptr) {
     if (currentScheduler) {
         throw std::runtime_error("Only one scheduler per thread is allowed.");
     }
 
     currentScheduler = this;
     mainFiber = ConvertThreadToFiber(nullptr);
+    iocpHandle = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 1);
+    if (!iocpHandle) {
+        throw std::runtime_error("Failed to create IOCP handle");
+    }
     vehHandle = AddVectoredExceptionHandler(1, VectoredExceptionHandler);
 
     DebugPrint("[Scheduler::Scheduler] Scheduler created and VEH registered\n");
@@ -38,6 +42,10 @@ Scheduler::~Scheduler() {
     if (vehHandle) {
         RemoveVectoredExceptionHandler(vehHandle);
         DebugPrint("[Scheduler::~Scheduler] VEH unregistered\n");
+    }
+
+    if (iocpHandle) {
+        CloseHandle(iocpHandle);
     }
 
     if (isThreadPool) {
@@ -62,6 +70,12 @@ void Scheduler::Add(std::function<void()> func) {
     auto co = std::make_unique<Coroutine>(std::move(func), nullptr, this);
     runnableQueue.push_back(co.get());
     coroutines.push_back(std::move(co));
+}
+
+void Scheduler::RegisterHandle(HANDLE handle) {
+    if (CreateIoCompletionPort(handle, iocpHandle, 0, 0) != iocpHandle) {
+        throw std::runtime_error("Failed to associate handle with IOCP");
+    }
 }
 
 void Scheduler::Stop() {
@@ -138,10 +152,25 @@ void Scheduler::Run() {
                 }
             }
             
-            if (timeout > 0 && timeout != INFINITE) {
-                Sleep(timeout);
-            } else if (timeout == INFINITE) {
-                Sleep(1);
+            DWORD bytesTransferred;
+            ULONG_PTR completionKey;
+            OVERLAPPED* overlapped;
+
+            DebugPrint("[Scheduler::Run] Waiting for IO events with timeout %u ms\n", timeout);
+            BOOL result = GetQueuedCompletionStatus(iocpHandle, &bytesTransferred, &completionKey, &overlapped, timeout);
+
+            if (result && overlapped) {
+                IoOperation* op = static_cast<IoOperation*>(overlapped);
+                DebugPrint("[Scheduler::Run] IO completed for coroutine %p, resuming.\n", op->coroutine);
+                runnableQueue.push_back(op->coroutine);
+            } else if (!result && overlapped) {
+                // IO operation failed
+                IoOperation* op = static_cast<IoOperation*>(overlapped);
+                // For now, just resume it. A more robust implementation would handle the error.
+                DebugPrint("[Scheduler::Run] IO failed for coroutine %p, resuming.\n", op->coroutine);
+                runnableQueue.push_back(op->coroutine);
+            } else {
+                DebugPrint("[Scheduler::Run] Wait timed out or woken up.\n");
             }
         }
     }
@@ -162,6 +191,10 @@ void Scheduler::Resume(Coroutine* co) {
         pendingException = co;
         co->state = Coroutine::State::Finished;
     }
+}
+
+Coroutine* Scheduler::GetRunningCoroutine() const {
+    return runningCoroutine;
 }
 
 Coroutine* Scheduler::PollException() {

@@ -36,6 +36,16 @@ void SetCurrentScheduler(Scheduler* scheduler);
 
 struct ExceptionState;
 
+struct IoOperation : public OVERLAPPED {
+    IoOperation() {
+        Internal = InternalHigh = 0;
+        Offset = OffsetHigh = 0;
+        hEvent = nullptr;
+        coroutine = nullptr;
+    }
+    Coroutine* coroutine;
+};
+
 void CaptureException(ExceptionState* es, const EXCEPTION_RECORD& record);
 bool HasException(const ExceptionState* es);
 void RethrowIfExists(const ExceptionState* es);
@@ -54,6 +64,7 @@ public:
 
     void Resume();
     static void YieldExecution();
+    static void SuspendExecution();
 
     bool HasException() const;
     void RethrowExceptionIfAny();
@@ -84,8 +95,10 @@ public:
     void Submit(std::function<void()> func);
     void Run();
     void Stop();
+    void RegisterHandle(HANDLE handle);
     void Resume(Coroutine* co);
     Coroutine* PollException();
+    Coroutine* GetRunningCoroutine() const;
     static void AsyncSleep(uint32_t milliseconds);
 
     template <typename T, typename Func, typename... Args>
@@ -103,31 +116,30 @@ public:
                 }
             } catch (...) {
                 /*
-                ！！！此处catch逻辑必须为空，否则程序将会出现未定义行为！！！
-
-                
-                异常捕获分为两个阶段：
-
-                第一阶段：VEH
-                当我们的协程内的task()抛出异常时，Scheduler注册的VEH会捕获到这个异常，VEH会立刻识别出该异常为协程中的C++异常，
-                然后将异常信息保存到当前协程的exceptionState中，并立即调用SwitchToFiber()将CPU的控制权从出错的协程切换回调度器的Run()循环。
-                最后返回EXCEPTION_CONTINUE_EXECUTION，让操作系统无视异常继续执行。
-
-                第二阶段：try-catch
-                在VEH完成了工作后，操作系统会继续“展开”出错的协程的函数调用栈（stack unwinding）
-                在“展开”过程中，这个异常会被我们的catch块捕获。
-                因此，本catch块的任务很简单————他只需要安静地“吞掉”这个异常，防止异常继续向上传播（导致程序终止）即可。
+                    !!! The logic in this catch block MUST be empty, otherwise it will lead to undefined behavior!!!
 
 
-                完整事件链：
+                    **Exception handling is divided into two stages**
+                    Stage 1 -> VEH
+                        When the `task()` within our coroutine throws an exception, the VEH registered by the Scheduler will catch it
+                        The VEH immediately identifies it as a C++ exception from the coroutine, then saves the exception information into the current coroutine's `exceptionState`
+                        and immediately calls `SwitchToFiber()` to switch CPU control from the faulting coroutine back to the Scheduler's `Run()` loop
+                        Finally, it returns `EXCEPTION_CONTINUE_EXECUTION`, telling the OS to ignore the exception and continue execution
 
-                task() 抛出异常 ->
-                VectoredExceptionHandler() 捕获异常信息，存入exceptionState，然后切换回调度器 ->
-                协程的调用栈展开，catch块捕获并“吞掉”异常，wait() 函数正常结束 ->
-                CorotineTrampoline() 将该协程的状态标记为Finished ->
-                Run() 调用该协程的onDone回调 ->
-                onDone() 检查exceptionState，发现里面有异常记录 ->
-                调用promise->SetException()
+                    Stage 2 -> try-catch
+                        After the VEH has completed its work, the operating system will continue the stack unwinding process for the faulting coroutine's call stack
+                        During this unwinding process, the exception will be caught by our catch block
+                        Therefore, the task of this catch block is very simple, it just needs to silently "eat" the exception to prevent it from propagating further (which would terminate the program)
+
+
+                    **Complete Event Chain**
+                    `task()` throws an exception ->
+                    `VectoredExceptionHandler()` captures exception info, stores it in `exceptionState`, then switches back to the scheduler ->
+                    The coroutine's call stack unwinds, the catch block catches and "eats" the exception, allowing the function to end normally ->
+                    `CoroutineTrampoline()` marks the coroutine's state as `Finished` ->
+                    `Run()` calls the coroutine's `onDone` callback ->
+                    `onDone()` checks `exceptionState`, finds an exception record ->
+                    `promise->SetException()` is called
                 */
             }
         };
@@ -152,6 +164,7 @@ private:
     friend class Coroutine;
 
     void* mainFiber;
+    HANDLE iocpHandle;
     Coroutine* runningCoroutine;
     std::vector<std::unique_ptr<Coroutine>> coroutines;
     void* vehHandle;
@@ -169,7 +182,6 @@ private:
     std::priority_queue<TimerNode, std::vector<TimerNode>, std::greater<TimerNode>> timers;
     std::unordered_set<Coroutine*> sleepingCoroutines;
 
-    // Thread pool members
     bool isThreadPool = false;
     std::vector<std::thread> workers;
     std::deque<std::function<void()>> tasks;
