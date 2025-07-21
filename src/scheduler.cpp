@@ -51,8 +51,7 @@ Scheduler::~Scheduler() {
 void Scheduler::Submit(std::function<void()> func) {
     if (!isThreadPool) {
         throw std::runtime_error("Submit is only for thread pool schedulers.");
-    }
-    {
+    } else {
         std::unique_lock<std::mutex> lock(queueMutex);
         tasks.push_back(std::move(func));
     }
@@ -68,8 +67,7 @@ void Scheduler::Add(std::function<void()> func) {
 void Scheduler::Stop() {
     if (!isThreadPool) {
         return;
-    }
-    {
+    } else {
         std::unique_lock<std::mutex> lock(queueMutex);
         stop = true;
     }
