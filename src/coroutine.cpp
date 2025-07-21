@@ -28,8 +28,7 @@ void RethrowIfExists(const ExceptionState* es) {
 
 void CoroutineTrampoline(void* arg);
 
-Coroutine::Coroutine(std::function<void()> f, std::function<void(std::shared_ptr<ExceptionState>)> onDoneCallback, Scheduler* s)
-    : func(std::move(f)), onDone(std::move(onDoneCallback)), state(State::Ready), scheduler(s), exceptionState(std::make_shared<ExceptionState>()) {
+Coroutine::Coroutine(std::function<void()> f, std::function<void(std::shared_ptr<ExceptionState>)> onDoneCallback, Scheduler* s) : func(std::move(f)), onDone(std::move(onDoneCallback)), state(State::Ready), scheduler(s), exceptionState(std::make_shared<ExceptionState>()) {
     DebugPrint("[Coroutine::Coroutine] Created fiber\n");
     fiber = CreateFiber(0, (LPFIBER_START_ROUTINE)CoroutineTrampoline, this);
 }

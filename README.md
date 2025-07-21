@@ -61,7 +61,7 @@ cmake --build . --config Release
 
 | Priority | Category | Key Tasks |
 | :---: | :--- | :--- |
-| ⚡ | **C++20 Coroutine Support** | [ ] Design `Task<T>`<br>[ ] Wrap Awaitables |
+| ⚡ | **Fiber-based Task/Await** | [√] Design `Task<T>`<br>[√] Implement `Await` |
 | ⚡⚡⚡⚡ | **Scheduler & Concurrency** | [√] Multi-threaded scheduler<br>[√] Integrate IOCP |
 | ⚡⚡ | **Coroutine Sync Primitives** | [ ] Async Mutex (`AsyncMutex`)<br>[ ] Async Semaphore (`AsyncSemaphore`)<br>[ ] Combinators (`WhenAll` / `WhenAny`) |
 | ⚡⚡⚡ | **API** | [ ] Cooperative Cancellation (`CancellationToken`) |

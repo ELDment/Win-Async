@@ -1,8 +1,8 @@
 #include "winAsync.h"
+#include "winAsyncTask.h"
 #include <windows.h>
 #include <stdexcept>
 #include <algorithm>
-#include <chrono>
 
 namespace {
     thread_local Scheduler* currentScheduler = nullptr;
@@ -14,6 +14,11 @@ Scheduler* GetCurrentScheduler() {
 
 void SetCurrentScheduler(Scheduler* scheduler) {
     currentScheduler = scheduler;
+}
+
+Scheduler& Scheduler::GetThreadPool() {
+    static Scheduler threadPool(std::thread::hardware_concurrency());
+    return threadPool;
 }
 
 Scheduler::Scheduler() : runningCoroutine(nullptr), vehHandle(nullptr), pendingException(nullptr), isThreadPool(false), stop(false), iocpHandle(nullptr) {
@@ -164,9 +169,7 @@ void Scheduler::Run() {
                 DebugPrint("[Scheduler::Run] IO completed for coroutine %p, resuming.\n", op->coroutine);
                 runnableQueue.push_back(op->coroutine);
             } else if (!result && overlapped) {
-                // IO operation failed
                 IoOperation* op = static_cast<IoOperation*>(overlapped);
-                // For now, just resume it. A more robust implementation would handle the error.
                 DebugPrint("[Scheduler::Run] IO failed for coroutine %p, resuming.\n", op->coroutine);
                 runnableQueue.push_back(op->coroutine);
             } else {

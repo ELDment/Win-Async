@@ -258,6 +258,90 @@ void MultiThreadedScheduler() {
     std::cout << "\tScheduler stopped" << std::endl;
 }
 
+void HybridSchedulingBenchmark() {
+    Scheduler scheduler;
+
+    scheduler.CreateCoroutine<void>([&]() {
+        const int numCoroutineTasks = 5;
+        const int numThreadPoolTasks = 5;
+        std::vector<Task<int>> tasks;
+        std::atomic<int> completedCount = 0;
+
+        std::cout << "\tStarting hybrid scheduling benchmark with " << numCoroutineTasks + numThreadPoolTasks << " tasks." << std::endl;
+
+        for (int i = 0; i < numCoroutineTasks; ++i) {
+            tasks.push_back(CreateTask<int>([i, &completedCount]() {
+                for (int j = 0; j < (i + 1) * 2; ++j) {
+                    Coroutine::YieldExecution();
+                }
+                completedCount++;
+                return i;
+            }));
+        }
+
+        for (int i = 0; i < numThreadPoolTasks; ++i) {
+            tasks.push_back(RunOnThreadPool<int>([i, &completedCount]() {
+                int result = 0;
+                for (int k = 0; k < 10000 * (i + 1); ++k) {
+                    result += k;
+                }
+                completedCount++;
+                return result;
+            }));
+        }
+
+        std::cout << "\tAll tasks launched. Awaiting results..." << std::endl;
+
+        for (auto& task : tasks) {
+            Await(task);
+        }
+
+        std::cout << "\tAll tasks completed." << std::endl;
+        assert(completedCount == numCoroutineTasks + numThreadPoolTasks);
+    });
+
+    scheduler.Run();
+}
+
+std::mutex g_std_mutex;
+std::vector<int> g_shared_data;
+
+void StdMutexDeadlockTest() {
+    g_shared_data.clear();
+
+    Scheduler scheduler;
+
+    scheduler.Add([]{
+        std::cout << "\t[Coroutine A] Trying to lock the mutex..." << std::endl;
+        g_std_mutex.lock();
+        std::cout << "\t[Coroutine A] Mutex locked" << std::endl;
+
+        g_shared_data.push_back(1);
+        std::cout << "\t[Coroutine A] Added data. Now sleeping for 100ms while holding the lock..." << std::endl;
+        
+        Scheduler::AsyncSleep(100);
+
+        std::cout << "\t[Coroutine A] Woke up. Releasing mutex" << std::endl;
+        g_std_mutex.unlock();
+    });
+
+    scheduler.Add([]{
+        std::cout << "\t[Coroutine B] Waiting for 10ms before trying to lock..." << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+        std::cout << "\t[Coroutine B] Trying to lock the mutex..." << std::endl;
+        g_std_mutex.lock(); 
+        std::cout << "\t[Coroutine B] Mutex locked" << std::endl;
+
+        g_shared_data.push_back(2);
+        std::cout << "\t[Coroutine B] Added data. Releasing mutex" << std::endl;
+        g_std_mutex.unlock();
+    });
+
+    scheduler.Run();
+    // The test passes because the deadlock is caught by the VEH...
+}
+
 } // namespace TestCases
 
 int main() {
@@ -269,6 +353,8 @@ int main() {
     testRunner->Register("Async Sleep", TestCases::AsyncSleep);
     testRunner->Register("Async IO", TestCases::AsyncIo);
     testRunner->Register("Multi-Threaded Scheduler", TestCases::MultiThreadedScheduler);
+    testRunner->Register("Hybrid Scheduling Benchmark", TestCases::HybridSchedulingBenchmark);
+    testRunner->Register("StdMutexDeadlockTest", TestCases::StdMutexDeadlockTest);
 
     return testRunner->RunAll();
 }
