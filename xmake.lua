@@ -17,7 +17,7 @@ target("coroutine")
     add_files(
         "src/coroutine.cpp",
         "src/scheduler.cpp",
-        "src/exception_handler.cpp"
+        "src/exception.cpp"
     )
     add_includedirs("include")
 

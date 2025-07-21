@@ -1,4 +1,4 @@
-#include "coroutine.h"
+#include "winAsync.h"
 #include <windows.h>
 
 LONG WINAPI Scheduler::VectoredExceptionHandler(PEXCEPTION_POINTERS ExceptionInfo) {
@@ -7,7 +7,7 @@ LONG WINAPI Scheduler::VectoredExceptionHandler(PEXCEPTION_POINTERS ExceptionInf
     if (scheduler && scheduler->runningCoroutine) {
         DebugPrint("[Scheduler::VectoredExceptionHandler] Exception occurred inside a coroutine.\n");
         if (ExceptionInfo->ExceptionRecord->ExceptionCode == 0xE06D7363) {
-            // C++ 异常
+            // C++ exception
             DebugPrint("[Scheduler::VectoredExceptionHandler] C++ exception detected. Capturing...\n");
             Coroutine* co = scheduler->runningCoroutine;
             CaptureException(co->exceptionState.get(), *ExceptionInfo->ExceptionRecord);

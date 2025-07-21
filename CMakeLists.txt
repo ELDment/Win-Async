@@ -15,7 +15,7 @@ endif()
 add_library(coroutine STATIC
     src/coroutine.cpp
     src/scheduler.cpp
-    src/exception_handler.cpp
+    src/exception.cpp
 )
 
 target_include_directories(coroutine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
